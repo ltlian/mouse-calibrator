@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using System.Collections.Generic;
 
 namespace MouseCalibrator
 
@@ -19,16 +20,13 @@ acceleration.
     /// <summary>
     /// The Mousecal class contains the default values and handler functions
     /// for the UI form.
+    /// 
+    /// Based on the following example:
+    /// https://www.fluxbytes.com/csharp/how-to-register-a-global-hotkey-for-your-application-in-c/
     /// </summary>
     {
 
-        // Default value
-        private int mickeyValueDefault = 5611;
-
-        // Initial values
-        private int shiftState = 0;
-        private int ctrlState = 0;
-        private int altState = 0;
+        private int mickeyValueDefault = 5000;
 
         [DllImport("User32.dll", EntryPoint = "mouse_event", CallingConvention = CallingConvention.Winapi)]
         internal static extern void Mouse_Event(int dwFlags, int dx, int dy, int dwData, int dwExtraInfo);
@@ -44,15 +42,16 @@ acceleration.
         [DllImport("user32.dll")]
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
-        enum KeyModifier
+        private IDictionary<CheckBox, KeyModifier> CheckBoxModifiers;
+
+        private enum KeyModifier
         {
-            None = 0,
             Alt = 1,
             Control = 2,
             Shift = 4
         }
 
-        // By assigning the arrow key enums to be mutually negative, the value
+        // By assigning the arrow key ids to be mutually negative, the value
         // can be used to multiply the input argument for Mouse_Event()
         private const int leftArrow = -1;
         private const int rightArrow = 1;
@@ -63,12 +62,12 @@ acceleration.
 
             mickeyInput.Value = mickeyValueDefault;
 
-            shiftState = SetModifierState(checkBoxS.Checked, KeyModifier.Shift);
-            ctrlState = SetModifierState(checkBoxC.Checked, KeyModifier.Control);
-            altState = SetModifierState(checkBoxA.Checked, KeyModifier.Alt);
-
-            UpdateModifierKeys(leftArrow, Keys.Left.GetHashCode());
-            UpdateModifierKeys(rightArrow, Keys.Right.GetHashCode());
+            CheckBoxModifiers = new Dictionary<CheckBox, KeyModifier>
+            {
+                { checkBoxA, KeyModifier.Alt },
+                { checkBoxC, KeyModifier.Control },
+                { checkBoxS, KeyModifier.Shift }
+            };
         }
 
         protected override void WndProc(ref Message m)
@@ -81,55 +80,23 @@ acceleration.
             }
         }
 
-        private void UI_Closing(object sender, FormClosingEventArgs e)
-        {
-            UnregisterHotKey(this.Handle, 0);
-            UnregisterHotKey(this.Handle, 1);
-        }
-
         private void CheckBoxUpdated(object sender, EventArgs e)
         {
-            CheckBox chk = (CheckBox)sender;
-            bool checkState = chk.Checked;
+            int modifiers = 0;
 
-            if (sender.Equals(checkBoxS))
+            // The modifier keycode is a bitwise 'or' of the KeyModifier enum values.
+            foreach (KeyValuePair<CheckBox, KeyModifier> pair in CheckBoxModifiers)
             {
-                this.shiftState = SetModifierState(checkState, KeyModifier.Shift);
-            }
-            if (sender.Equals(checkBoxC))
-            {
-                this.ctrlState = SetModifierState(checkState, KeyModifier.Control);
-            }
-            if (sender.Equals(checkBoxA))
-            {
-                this.altState = SetModifierState(checkState, KeyModifier.Alt);
+                modifiers |= pair.Key.Checked ? (int)pair.Value : 0;
             }
 
-            UpdateModifierKeys(leftArrow, Keys.Left.GetHashCode());
-            UpdateModifierKeys(rightArrow, Keys.Right.GetHashCode());
+            RegisterHotKey(this.Handle, leftArrow, modifiers, Keys.Left.GetHashCode());
+            RegisterHotKey(this.Handle, rightArrow, modifiers, Keys.Right.GetHashCode());
         }
 
-        private int SetModifierState(bool checkState, KeyModifier modifierKey)
-        {
-            if (checkState)
-            {
-                return (int)modifierKey;
-            }
-            else
-            {
-                return 0;
-            }
-        }
-
-        // ResetMickey resets the calibrator value
         private void ResetMickey(object sender, EventArgs e)
         {
             mickeyInput.Value = mickeyValueDefault;
-        }
-
-        private void UpdateModifierKeys(int id, int keyHashCode)
-        {
-            RegisterHotKey(this.Handle, id, shiftState | this.ctrlState | this.altState, keyHashCode);
         }
 
         // Suppress windows sound notification on enter keypress
@@ -140,6 +107,12 @@ acceleration.
                 e.Handled = true;
                 e.SuppressKeyPress = true;
             }
+        }
+
+        private void UI_Closing(object sender, FormClosingEventArgs e)
+        {
+            UnregisterHotKey(this.Handle, leftArrow);
+            UnregisterHotKey(this.Handle, rightArrow);
         }
     }
 }

@@ -45,11 +45,6 @@
             this.mickeyInput.Name = "mickeyInput";
             this.mickeyInput.Size = new System.Drawing.Size(58, 20);
             this.mickeyInput.TabIndex = 0;
-            this.mickeyInput.Value = new decimal(new int[] {
-            1,
-            0,
-            0,
-            0});
             this.mickeyInput.KeyDown += new System.Windows.Forms.KeyEventHandler(this.SuppressEnter);
             // 
             // resetBtn
